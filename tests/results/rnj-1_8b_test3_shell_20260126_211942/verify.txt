@@ -1,0 +1,6 @@
+Hostname:  plebdesk
+Kernel:  6.18.3-arch1-1
+Disk usage (/):
+ df -h /
+Top 3 memory-consuming processes:
+ ps aux --sort=-%mem
