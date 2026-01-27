@@ -1,9 +1,0 @@
-Hostname:  plebdesk
-Kernel version:  6.18.3-arch1-1
-Disk usage for /: 
-/dev/mapper/root  930G  200G  728G  22% /
-Top 3 memory-consuming processes:
-USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-plebdesk  709466  140  2.9 48833996 972652 ?     Sl   13:18   0:34 /usr/local/bin/ollama runner --ollama-engine --model /home/plebdesk/.ollama/models/blobs/sha256-e0785291058ca42a1338fa800e73fa4ec07d8d3176510616dae9af9e83ddc372 --port 45913
-plebdesk  362040 14.1  2.4 11890300 816328 ?     Sl   Jan26 114:44 clawdbot-gateway
-plebdesk  612773  1.2  0.9 2390820 322776 ?      Ssl  09:40   2:39 /usr/bin/ghostty --gtk-single-instance=true --class=org.omarchy.btop -e btop

@@ -1,4 +1,0 @@
-Alice:85
-Bob:92
-Carol:78
-Average:85.0
