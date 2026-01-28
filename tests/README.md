@@ -64,11 +64,13 @@ Beyond pass/fail, tests compute a weighted quality score:
 | Dimension | Weight | Measurement |
 |-----------|--------|-------------|
 | Correctness | 40% | Tests passed / total tests |
-| Efficiency | 20% | Iterations used (fewer is better, baseline: 3/test) |
-| Speed | 20% | Time taken (faster is better, baseline: 15s/test) |
+| Efficiency | 20% | Iterations used (fewer is better, baseline: 4/test) |
+| Speed | 20% | Time taken (faster is better, baseline: 25s/test) |
 | Format | 20% | Output correctness (tied to pass rate) |
 
 Higher scores indicate better overall sub-agent performance.
+
+**Note**: Baselines increased for advanced tests 9-14 which require network calls and complex logic.
 
 ## Model Compatibility
 
@@ -127,6 +129,10 @@ Use `./compare-results.sh --json` for machine-readable output:
 - Node.js available (for test 6)
 - jq (JSON processor)
 - Basic Unix tools (grep, awk, cat, timeout)
+- SQLite3 (for test 13)
+- Internet connection (for tests 9, 12 - HTTP requests)
+- `requests` Python package (for test 9)
+- `aiohttp` Python package (for test 12, auto-installed)
 
 ## What Makes a Good Sub-Agent Model?
 
@@ -137,6 +143,10 @@ Use `./compare-results.sh --json` for machine-readable output:
 5. **Error recovery** - Graceful handling of failures
 6. **Multi-file comprehension** - Understands context across files
 7. **Debugging ability** - Can interpret errors and fix issues
+8. **Design patterns** - Can structure code into classes (tests 9, 11)
+9. **Algorithm knowledge** - Operator precedence, async patterns (tests 10, 12)
+10. **Database skills** - SQL joins, aggregation, normalization (test 13)
+11. **CLI architecture** - Subcommands, argument parsing (test 14)
 
 ## Example Output
 
@@ -153,10 +163,14 @@ Use `./compare-results.sh --json` for machine-readable output:
 [test] Running: test2_config
 [PASS] test2_config (8s, 1 iter)
 ...
+[test] Running: test13_sql
+[PASS] test13_sql (45s, 4 iter)
+[test] Running: test14_cli
+[PASS] test14_cli (38s, 3 iter)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RESULTS: 8/8 passed (96s total)
-QUALITY SCORE: 87/100
+RESULTS: 12/14 passed (280s total)
+QUALITY SCORE: 72/100
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 

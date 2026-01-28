@@ -339,19 +339,19 @@ Call task_complete confirming the file was created." \
 "test -f '$TEST_WORKDIR/test8_format/users.csv' && test \$(wc -l < '$TEST_WORKDIR/test8_format/users.csv') -eq 4 && head -1 '$TEST_WORKDIR/test8_format/users.csv' | grep -q '^name,age,city$'"
 
 # ============================================================
-# TEST 9: REST API Client with Error Handling
+# TEST 9: REST API Client with Error Handling (stdlib only)
 # ============================================================
 run_test "test9_api_client" \
 "You MUST use tools. Do NOT output code as text.
 
-Create a Python REST API client. Use write_file to create 'api_client.py' with:
+Create a Python REST API client using ONLY stdlib (urllib). Use write_file to create 'api_client.py' with:
 
 1. A class HttpBinClient with:
    - __init__(self, base_url='https://httpbin.org')
-   - get(self, endpoint) method - makes GET request, returns JSON dict
-   - post(self, endpoint, data) method - makes POST request with JSON body, returns JSON dict
-   - Both methods must have try/except for requests.exceptions.RequestException
-   - Both methods should raise or return error info on non-2xx status codes
+   - get(self, endpoint) method - uses urllib.request to make GET request, returns JSON dict
+   - post(self, endpoint, data) method - uses urllib.request to make POST request with JSON body, returns JSON dict
+   - Both methods must have try/except for urllib.error.URLError
+   - Both methods should handle non-2xx status codes
 
 2. A simple test at the bottom:
    if __name__ == '__main__':
@@ -368,7 +368,7 @@ Use run_command: python api_client.py
 Call task_complete with summary." \
 "test -f '$TEST_WORKDIR/test9_api_client/api_client.py' && \
  grep -q 'class HttpBinClient' '$TEST_WORKDIR/test9_api_client/api_client.py' && \
- grep -qE '(requests\.exceptions|RequestException|try:)' '$TEST_WORKDIR/test9_api_client/api_client.py' && \
+ grep -qE '(urllib|URLError|try:)' '$TEST_WORKDIR/test9_api_client/api_client.py' && \
  python '$TEST_WORKDIR/test9_api_client/api_client.py' 2>&1 | grep -q 'True'" \
 120
 
@@ -547,45 +547,44 @@ Call task_complete with summary of what you refactored." \
 180
 
 # ============================================================
-# TEST 12: Async Data Fetcher with Concurrency
+# TEST 12: Async Task Processing (stdlib only)
 # ============================================================
 run_test "test12_async" \
 "You MUST use tools. Do NOT output code as text.
 
-Create an async data fetcher. Use write_file to create 'async_fetcher.py' with:
+Create an async task processor using ONLY stdlib. Use write_file to create 'async_processor.py' with:
 
-1. An async function fetch_url(session, url) that:
-   - Uses aiohttp to fetch a URL
-   - Returns a dict with 'url', 'status', and 'length' (content length)
-   - On timeout or error, returns dict with 'url', 'error' key
+1. An async function process_item(item, delay) that:
+   - Simulates async work with await asyncio.sleep(delay)
+   - Returns a dict with 'item', 'result' (item * 2 if int, item.upper() if str), 'delay'
 
-2. An async function fetch_all(urls, timeout=10) that:
-   - Fetches all URLs concurrently using asyncio.gather
-   - Uses a single aiohttp.ClientSession for efficiency
+2. An async function process_all(items) that:
+   - Processes all items concurrently using asyncio.gather
+   - Each item gets a random delay between 0.1 and 0.5 seconds
    - Returns list of results
 
 3. Main block that tests:
    if __name__ == '__main__':
        import asyncio
-       urls = [
-           'https://httpbin.org/get',
-           'https://httpbin.org/delay/1',
-           'https://httpbin.org/status/200',
-       ]
-       results = asyncio.run(fetch_all(urls))
-       success = sum(1 for r in results if 'status' in r and r['status'] == 200)
-       print(f'Fetched {len(results)} URLs, {success} successful')
+       import time
+       items = [1, 2, 'hello', 3, 'world']
+       start = time.time()
+       results = asyncio.run(process_all(items))
+       elapsed = time.time() - start
+       print(f'Processed {len(results)} items in {elapsed:.2f}s')
        for r in results:
-           print(f\"  {r.get('url', 'unknown')}: {r.get('status', 'error')}\")
+           print(f\"  {r['item']} -> {r['result']}\")
+       # Verify concurrency: should take < 1s total (not 2.5s sequential)
+       print(f'Concurrent: {elapsed < 1.0}')
 
-Use run_command: pip install aiohttp --quiet 2>/dev/null; python async_fetcher.py
+Use run_command: python async_processor.py
 
 Call task_complete with summary." \
-"test -f '$TEST_WORKDIR/test12_async/async_fetcher.py' && \
- grep -qE 'async def|asyncio|aiohttp' '$TEST_WORKDIR/test12_async/async_fetcher.py' && \
- grep -q 'gather' '$TEST_WORKDIR/test12_async/async_fetcher.py' && \
- cd '$TEST_WORKDIR/test12_async' && pip install aiohttp --quiet 2>/dev/null; python async_fetcher.py 2>&1 | grep -qE 'Fetched [0-9]+ URLs'" \
-150
+"test -f '$TEST_WORKDIR/test12_async/async_processor.py' && \
+ grep -qE 'async def|asyncio' '$TEST_WORKDIR/test12_async/async_processor.py' && \
+ grep -q 'gather' '$TEST_WORKDIR/test12_async/async_processor.py' && \
+ python '$TEST_WORKDIR/test12_async/async_processor.py' 2>&1 | grep -qE 'Processed [0-9]+ items'" \
+120
 
 # ============================================================
 # TEST 13: SQLite Database Operations
