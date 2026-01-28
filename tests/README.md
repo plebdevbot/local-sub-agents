@@ -20,6 +20,8 @@ Reproducible benchmark tests for comparing local LLM performance as sub-agents.
 
 ## Test Descriptions
 
+### Basic Tests (1-8)
+
 | Test | Name | What It Tests | Verification |
 |------|------|---------------|--------------|
 | 1 | Python Script | Code generation, secrets module, main block | Runs and outputs 3+ passwords |
@@ -30,6 +32,24 @@ Reproducible benchmark tests for comparing local LLM performance as sub-agents.
 | 6 | Multi-File | Cross-file comprehension, bug fixing | Fix 'YYYY' bug, output shows year |
 | 7 | Debugging | Run -> interpret error -> fix -> verify | Fix undefined variable, runs successfully |
 | 8 | Format Compliance | Exact output format, instruction following | CSV has 4 lines, correct header |
+
+### Advanced Tests (9-14)
+
+| Test | Name | What It Tests | Verification |
+|------|------|---------------|--------------|
+| 9 | API Client | HTTP client class, error handling, requests lib | Class exists, handles GET/POST, runs successfully |
+| 10 | Expression Parser | Parsing, operator precedence, parentheses | Evaluates 5 test expressions correctly (4+ PASS) |
+| 11 | Refactor Class | Split god object into 4 classes | All 4 classes exist, original tests pass |
+| 12 | Async Fetcher | asyncio, aiohttp, concurrent requests | Uses async/gather, fetches multiple URLs |
+| 13 | SQL Database | SQLite schema, queries, joins, CSV export | Creates DB with tables, exports revenue.csv |
+| 14 | CLI Tool | argparse subcommands, file I/O, persistence | Has subparsers, add/list/search work |
+
+### Test Difficulty Progression
+
+- **Tests 1-4**: Basic tool usage - can the model use tools at all?
+- **Tests 5-8**: Error recovery and multi-step - can it handle problems?
+- **Tests 9-11**: Complex code generation - can it write non-trivial code?
+- **Tests 12-14**: Advanced patterns - async, SQL, CLI architecture
 
 ## Scoring System
 
