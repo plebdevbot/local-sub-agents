@@ -571,11 +571,11 @@ Create an async task processor using ONLY stdlib. Use write_file to create 'asyn
        start = time.time()
        results = asyncio.run(process_all(items))
        elapsed = time.time() - start
-       print(f'Processed {len(results)} items in {elapsed:.2f}s')
+       print('Processed', len(results), 'items in', round(elapsed, 2), 'seconds')
        for r in results:
-           print(f\"  {r['item']} -> {r['result']}\")
-       # Verify concurrency: should take < 1s total (not 2.5s sequential)
-       print(f'Concurrent: {elapsed < 1.0}')
+           print(' ', r.get('item'), '->', r.get('result'))
+       # Verify concurrency: should take less than 1s total (not 2.5s sequential)
+       print('Concurrent:', elapsed < 1.0)
 
 Use run_command: python async_processor.py
 
