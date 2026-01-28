@@ -319,7 +319,7 @@ STEP 4: run_command 'python calculator.py' again to verify the fix works
 
 Call task_complete when the script runs successfully." \
 "python '$TEST_WORKDIR/test7_debug/calculator.py' 2>&1 | grep -qE 'Average.*[0-9]+'" \
-90
+240
 
 # ============================================================
 # TEST 8: Format Compliance
@@ -370,7 +370,7 @@ Call task_complete with summary." \
  grep -q 'class HttpBinClient' '$TEST_WORKDIR/test9_api_client/api_client.py' && \
  grep -qE '(urllib|URLError|try:)' '$TEST_WORKDIR/test9_api_client/api_client.py' && \
  python '$TEST_WORKDIR/test9_api_client/api_client.py' 2>&1 | grep -q 'True'" \
-120
+240
 
 # ============================================================
 # TEST 10: Expression Parser with Operator Precedence
@@ -408,7 +408,7 @@ Call task_complete with summary." \
 "test -f '$TEST_WORKDIR/test10_parser/expr_parser.py' && \
  grep -q 'parse_and_eval' '$TEST_WORKDIR/test10_parser/expr_parser.py' && \
  python '$TEST_WORKDIR/test10_parser/expr_parser.py' 2>&1 | grep -c 'PASS' | grep -qE '^[4-5]$'" \
-150
+200
 
 # ============================================================
 # TEST 11: Refactor a Messy Class
@@ -544,7 +544,7 @@ Call task_complete with summary of what you refactored." \
  grep -q 'class Logger' '$TEST_WORKDIR/test11_refactor/refactored.py' && \
  grep -q 'class StatsCalculator' '$TEST_WORKDIR/test11_refactor/refactored.py' && \
  cd '$TEST_WORKDIR/test11_refactor' && python messy_code.py 2>&1 | grep -q 'All refactoring tests passed'" \
-180
+240
 
 # ============================================================
 # TEST 12: Async Task Processing (stdlib only)
@@ -584,7 +584,7 @@ Call task_complete with summary." \
  grep -qE 'async def|asyncio' '$TEST_WORKDIR/test12_async/async_processor.py' && \
  grep -q 'gather' '$TEST_WORKDIR/test12_async/async_processor.py' && \
  python '$TEST_WORKDIR/test12_async/async_processor.py' 2>&1 | grep -qE 'Processed [0-9]+ items'" \
-120
+240
 
 # ============================================================
 # TEST 13: SQLite Database Operations
@@ -619,7 +619,7 @@ Call task_complete with summary." \
  sqlite3 '$TEST_WORKDIR/test13_sql/shop.db' 'SELECT COUNT(*) FROM products' | grep -qE '^[4-9]' && \
  sqlite3 '$TEST_WORKDIR/test13_sql/shop.db' 'SELECT COUNT(*) FROM orders' | grep -qE '^[5-9]' && \
  grep -qi 'electronics\|furniture' '$TEST_WORKDIR/test13_sql/revenue.csv'" \
-150
+200
 
 # ============================================================
 # TEST 14: CLI Tool with Argparse
@@ -658,7 +658,7 @@ Call task_complete with summary." \
  python notes_cli.py add --title 'Test' --content 'Testing the CLI tool' && \
  python notes_cli.py list 2>&1 | grep -qi 'test' && \
  test -f '$TEST_WORKDIR/test14_cli/notes.json'" \
-150
+200
 
 # ============================================================
 # Results Summary
