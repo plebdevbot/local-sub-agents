@@ -2,6 +2,17 @@
 
 **Purpose:** Delegate small tasks to local LLMs running via Ollama + custom agentic wrapper.
 
+## Latest Benchmark (2026-01-27)
+
+| Model | Tests Passed | Score | Status |
+|-------|--------------|-------|--------|
+| **qwen3:8b** | **10/14** | **73/100** | 🥇 Best |
+| gpt-oss:20b | 7/8* | 70/100 | Good |
+| devstral-small-2 | 8/8* | 69/100 | Good |
+| ministral-3 | 6/8* | 79/100 | Decent |
+
+*Earlier benchmark with 8 tests. Full 14-test suite pending.
+
 ---
 
 ## Architecture
@@ -41,11 +52,36 @@
 
 ```bash
 # Run a task
-~/Desktop/local-sub-agents/ollama-agent.sh "Create a hello world script" /tmp
+./ollama-agent.sh "Create a hello world script" /tmp
 
 # With different model
-OLLAMA_MODEL=glm-4.7-flash:latest ~/Desktop/local-sub-agents/ollama-agent.sh "task" /dir
+OLLAMA_MODEL=glm-4.7-flash:latest ./ollama-agent.sh "task" /dir
+
+# Run benchmark suite
+cd tests && ./run-tests.sh qwen3:8b
+
+# Compare models
+cd tests && ./compare-results.sh
 ```
+
+---
+
+## Test Suite
+
+**14 tests** covering basic to advanced coding tasks:
+
+| Tests | Focus | Examples |
+|-------|-------|----------|
+| 1-8 | Basics | Python scripts, configs, shell, debugging |
+| 9-14 | Advanced | API clients, parsers, async, SQL, CLI tools |
+
+**Scoring weights** (accuracy > speed):
+- Correctness: 50%
+- Efficiency: 20%  
+- Speed: 10%
+- Format: 20%
+
+See [tests/README.md](tests/README.md) for details.
 
 ---
 
@@ -64,10 +100,12 @@ OLLAMA_MODEL=glm-4.7-flash:latest ~/Desktop/local-sub-agents/ollama-agent.sh "ta
 
 | Model | Size | Speed | Tool Support | Notes |
 |-------|------|-------|--------------|-------|
-| `qwen3:8b` | 5.2 GB | Fast | ✅ Excellent | Recommended default |
+| `qwen3:8b` | 5.2 GB | Fast | ✅ Excellent | **Recommended default** |
 | `rnj-1:8b` | ~5 GB | Very fast | ✅ Excellent | Best speed/quality ratio |
-| `glm-4.7-flash:latest` | 19 GB | Slower | ✅ Good | Better reasoning |
-| `ministral-3:latest` | ~3 GB | Fast | ⚠️ Partial | May fail shell tests |
+| `devstral-small-2` | ~8 GB | Medium | ✅ Good | Passes all basic tests |
+| `gpt-oss:20b` | ~13 GB | Slower | ✅ Good | Larger, more capable |
+| `glm-4.7-flash` | 19 GB | Slower | ✅ Good | Better reasoning |
+| `ministral-3` | ~3 GB | Fast | ⚠️ Partial | May fail complex tests |
 | `llama3.1:8b` | ~5 GB | Medium | ❌ Limited | Tool format issues |
 | `mistral:7b` | ~4 GB | Medium | ❌ Limited | Tool format issues |
 
@@ -81,55 +119,6 @@ OLLAMA_TIMEOUT=120             # API timeout in seconds
 OLLAMA_QUIET=1                 # Suppress verbose output
 OLLAMA_MAX_ITERATIONS=10       # Max tool call loops
 ```
-
----
-
-## Flow
-
-### 1. Task Identification
-Main agent identifies tasks suitable for delegation:
-- **Size:** Small, focused (avoid huge multi-file refactors)
-- **Scope:** Well-defined, single objective
-- **Examples:** 
-  - Write a utility script
-  - Create a config file
-  - Generate test cases
-  - Parse/transform data
-  - Simple file operations
-
-### 2. Prompt Crafting
-Include in your prompt:
-- Clear objective
-- Working directory context
-- Specific requirements
-- Expected output files
-- "When done, call task_complete with a summary"
-
-### 3. Execution
-```bash
-# From main agent (background)
-exec pty:true background:true command:"~/Desktop/local-sub-agents/ollama-agent.sh 'Your task. When done, call task_complete.' /workdir"
-
-# Monitor
-process action:log sessionId:XXX
-```
-
-### 4. Review
-- Check created files
-- Validate syntax/functionality
-- Report to user
-
----
-
-## Tool Reference
-
-| Tool | Parameters | Description |
-|------|------------|-------------|
-| `write_file` | path, content | Write content to file (creates dirs) |
-| `read_file` | path | Read file contents |
-| `run_command` | command | Execute shell command |
-| `list_files` | path (optional) | List directory contents |
-| `task_complete` | summary | Signal done, provide summary |
 
 ---
 
@@ -149,6 +138,18 @@ process action:log sessionId:XXX
 - Tasks requiring user interaction
 - Complex debugging
 - Anything needing clarification mid-task
+
+---
+
+## Tool Reference
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `write_file` | path, content | Write content to file (creates dirs) |
+| `read_file` | path | Read file contents |
+| `run_command` | command | Execute shell command |
+| `list_files` | path (optional) | List directory contents |
+| `task_complete` | summary | Signal done, provide summary |
 
 ---
 
@@ -172,6 +173,22 @@ When done, call task_complete with a summary.
 
 ---
 
+## Files
+
+```
+local-sub-agents/
+├── ollama-agent.sh          # Main wrapper script
+├── README.md                # This documentation
+└── tests/
+    ├── run-tests.sh         # Test runner (14 tests)
+    ├── benchmark-all-models.sh  # Full model comparison
+    ├── compare-results.sh   # Compare results (--json)
+    ├── README.md            # Test documentation
+    └── results/             # Test output (gitignored)
+```
+
+---
+
 ## Troubleshooting
 
 **Model outputs garbage:**
@@ -191,36 +208,4 @@ When done, call task_complete with a summary.
 ## Why Not OpenCode?
 
 OpenCode's Ollama integration has a bug where tool calls fail with "Invalid Tool" errors. 
-The model understands tasks and attempts tool calls, but OpenCode's tool execution layer 
-doesn't properly handle Ollama's response format.
-
 Our custom `ollama-agent.sh` wrapper calls Ollama's native API directly, which works perfectly.
-
----
-
-## Files
-
-```
-local-sub-agents/
-├── ollama-agent.sh      # Main wrapper script
-├── README.md            # This documentation
-├── PLAN.md              # Improvement roadmap
-├── TEST-RESULTS.md      # Test results summary
-└── tests/
-    ├── run-tests.sh     # Automated test runner (8 tests)
-    ├── compare-results.sh # Compare models (supports --json)
-    ├── README.md        # Test documentation
-    └── results/         # Test output (gitignored)
-```
-
-## Comparing Models
-
-```bash
-# Run tests against different models
-cd tests/
-./run-tests.sh qwen3:8b
-./run-tests.sh glm-4.7-flash:latest
-
-# Compare results
-./compare-results.sh
-```
