@@ -2,10 +2,12 @@
 # benchmark-all-models.sh - Run the sub-agent benchmark against all local ollama models
 # Usage: ./benchmark-all-models.sh [--quick]
 
-set -euo pipefail
+# Don't exit on errors - continue with next model
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 QUICK="${1:-}"
+MODEL_TIMEOUT=1800  # 30 minutes per model max
 
 # Colors
 RED='\033[0;31m'
@@ -18,6 +20,7 @@ NC='\033[0m'
 log() { echo -e "${CYAN}[benchmark]${NC} $1"; }
 success() { echo -e "${GREEN}[success]${NC} $1"; }
 warn() { echo -e "${YELLOW}[warn]${NC} $1"; }
+error() { echo -e "${RED}[error]${NC} $1"; }
 
 # Get all available models
 MODELS=$(ollama list | tail -n +2 | awk '{print $1}')
@@ -46,6 +49,8 @@ cat > "$SUMMARY_FILE" << EOF
 EOF
 
 CURRENT=0
+FAILED_MODELS=()
+
 for MODEL in $MODELS; do
     CURRENT=$((CURRENT + 1))
     log "[$CURRENT/$TOTAL] Testing: $MODEL"
@@ -54,11 +59,12 @@ for MODEL in $MODELS; do
     # Record start time
     START_TIME=$(date +%s)
     
-    # Run the benchmark
+    # Run the benchmark with timeout and error handling
+    EXIT_CODE=0
     if [[ "$QUICK" == "--quick" ]]; then
-        "$SCRIPT_DIR/run-tests.sh" "$MODEL" --quick 2>&1 | tee -a "/tmp/benchmark_${MODEL//[:\/]/_}.log"
+        timeout $MODEL_TIMEOUT "$SCRIPT_DIR/run-tests.sh" "$MODEL" --quick 2>&1 | tee -a "/tmp/benchmark_${MODEL//[:\/]/_}.log" || EXIT_CODE=$?
     else
-        "$SCRIPT_DIR/run-tests.sh" "$MODEL" 2>&1 | tee -a "/tmp/benchmark_${MODEL//[:\/]/_}.log"
+        timeout $MODEL_TIMEOUT "$SCRIPT_DIR/run-tests.sh" "$MODEL" 2>&1 | tee -a "/tmp/benchmark_${MODEL//[:\/]/_}.log" || EXIT_CODE=$?
     fi
     
     # Record end time
@@ -70,25 +76,57 @@ for MODEL in $MODELS; do
     echo "- Duration: ${DURATION}s" >> "$SUMMARY_FILE"
     echo "- Log: \`/tmp/benchmark_${MODEL//[:\/]/_}.log\`" >> "$SUMMARY_FILE"
     
+    # Check exit status
+    if [ $EXIT_CODE -eq 124 ]; then
+        error "$MODEL timed out after ${MODEL_TIMEOUT}s"
+        echo "- Status: TIMEOUT" >> "$SUMMARY_FILE"
+        FAILED_MODELS+=("$MODEL (timeout)")
+    elif [ $EXIT_CODE -ne 0 ]; then
+        error "$MODEL failed with exit code $EXIT_CODE"
+        echo "- Status: FAILED (exit $EXIT_CODE)" >> "$SUMMARY_FILE"
+        FAILED_MODELS+=("$MODEL (exit $EXIT_CODE)")
+    else
+        success "Completed $MODEL in ${DURATION}s"
+        echo "- Status: SUCCESS" >> "$SUMMARY_FILE"
+    fi
+    
     # Extract pass/fail from latest results
     LATEST_RESULT=$(ls -t "$SCRIPT_DIR/results/${MODEL//[:\/]/_}"*.md 2>/dev/null | head -1)
     if [[ -n "$LATEST_RESULT" ]]; then
         PASSES=$(grep -c "| PASS |" "$LATEST_RESULT" 2>/dev/null || echo "0")
         FAILS=$(grep -c "| FAIL |" "$LATEST_RESULT" 2>/dev/null || echo "0")
+        SCORE=$(grep "QUALITY SCORE:" "$LATEST_RESULT" 2>/dev/null | awk '{print $3}' || echo "N/A")
         echo "- Passed: $PASSES, Failed: $FAILS" >> "$SUMMARY_FILE"
+        echo "- Score: $SCORE" >> "$SUMMARY_FILE"
     fi
     echo "" >> "$SUMMARY_FILE"
     
-    success "Completed $MODEL in ${DURATION}s"
     echo ""
     echo "---"
     echo ""
     
+    # Kill any lingering processes
+    pkill -f "ollama-agent.sh" 2>/dev/null || true
+    
     # Give ollama a moment to unload the model
-    sleep 2
+    sleep 3
 done
 
+# Final summary
+if [ ${#FAILED_MODELS[@]} -gt 0 ]; then
+    echo "" >> "$SUMMARY_FILE"
+    echo "## Failed Models" >> "$SUMMARY_FILE"
+    echo "" >> "$SUMMARY_FILE"
+    for failed in "${FAILED_MODELS[@]}"; do
+        echo "- $failed" >> "$SUMMARY_FILE"
+    done
+fi
+
 log "All benchmarks complete!"
+log "Successful: $((TOTAL - ${#FAILED_MODELS[@]}))/$TOTAL"
+if [ ${#FAILED_MODELS[@]} -gt 0 ]; then
+    warn "Failed models: ${FAILED_MODELS[*]}"
+fi
 log "Summary saved to: $SUMMARY_FILE"
 echo ""
 cat "$SUMMARY_FILE"
