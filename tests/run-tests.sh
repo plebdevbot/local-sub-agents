@@ -63,11 +63,11 @@ passed_tests=0
 total_time=0
 total_iterations=0
 
-# Quality scoring weights (accuracy > speed)
-WEIGHT_CORRECTNESS=50
-WEIGHT_EFFICIENCY=20
-WEIGHT_SPEED=10
-WEIGHT_FORMAT=20
+# Quality scoring weights (heavily prioritize accuracy over speed)
+WEIGHT_CORRECTNESS=65  # Pass rate is king
+WEIGHT_EFFICIENCY=10   # Iterations still matter for token usage
+WEIGHT_SPEED=0         # Speed doesn't matter - accuracy does
+WEIGHT_FORMAT=25       # Output correctness is important
 
 # Baseline values for scoring (can be adjusted)
 # Note: Tests 9-14 are more complex, so baselines are adjusted
@@ -731,10 +731,10 @@ cat >> "$RESULT_FILE" << EOF
 
 | Dimension | Weight | Description |
 |-----------|--------|-------------|
-| Correctness | 50% | Tests passed |
-| Efficiency | 20% | Fewer iterations is better (baseline: ${BASELINE_ITERATIONS}/test) |
-| Speed | 10% | Faster is better (baseline: ${BASELINE_TIME}s/test) |
-| Format | 20% | Output correctness |
+| Correctness | 65% | Tests passed (primary factor) |
+| Efficiency | 10% | Fewer iterations is better (baseline: ${BASELINE_ITERATIONS}/test) |
+| Speed | 0% | Not weighted (accuracy matters more than speed) |
+| Format | 25% | Output correctness |
 
 ## Test Artifacts
 
