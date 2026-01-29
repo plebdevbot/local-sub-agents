@@ -86,8 +86,11 @@ run_test() {
     log "Running: $name"
     local start_time=$(date +%s)
 
-    # Run the agent with timeout
-    timeout "$timeout_secs" bash -c "OLLAMA_MODEL=\"$MODEL\" \"$AGENT\" \"$prompt\" \"$workdir\"" > "$workdir/output.log" 2>&1 || true
+    # Run the agent with timeout (use --kill-after to ensure cleanup)
+    timeout --kill-after=10s "$timeout_secs" bash -c "OLLAMA_MODEL=\"$MODEL\" \"$AGENT\" \"$prompt\" \"$workdir\"" > "$workdir/output.log" 2>&1 || true
+    
+    # Ensure any lingering child processes are killed
+    pkill -P $$ -f "ollama-agent.sh" 2>/dev/null || true
 
     local end_time=$(date +%s)
     local elapsed=$((end_time - start_time))
@@ -99,17 +102,24 @@ run_test() {
     iterations=${iterations:-0}
     total_iterations=$((total_iterations + iterations))
 
-    # Verify result
+    # Verify result with timeout (prevent hangs from buggy generated code)
     local result="FAIL"
     local notes=""
+    local verify_timeout=30  # 30 seconds max for verification
 
-    if eval "$verify_cmd" > /dev/null 2>&1; then
+    if timeout "$verify_timeout" bash -c "$verify_cmd" > /dev/null 2>&1; then
         result="PASS"
         passed_tests=$((passed_tests + 1))
         pass "$name (${elapsed}s, ${iterations} iter)"
     else
-        fail "$name (${elapsed}s, ${iterations} iter)"
-        notes="Verification failed"
+        local verify_exit=$?
+        if [[ $verify_exit -eq 124 ]]; then
+            fail "$name (${elapsed}s, ${iterations} iter)"
+            notes="Verification timeout (${verify_timeout}s)"
+        else
+            fail "$name (${elapsed}s, ${iterations} iter)"
+            notes="Verification failed"
+        fi
     fi
 
     # Log to results file
@@ -189,6 +199,11 @@ log "Warming up model: $MODEL"
 if ! curl -s http://localhost:11434/api/chat -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"stream\":false}" > /dev/null 2>&1; then
     echo "Error: Failed to warm up model. Is '$MODEL' pulled? Try: ollama pull $MODEL"
     exit 1
+fi
+
+# Quick mode indicator
+if [[ "$QUICK" == "--quick" ]]; then
+    log "Quick mode: Running tests 1-8 only (skipping complex tests 9-14)"
 fi
 
 # ============================================================
@@ -350,6 +365,11 @@ Then use run_command: cat users.csv
 
 Call task_complete confirming the file was created." \
 "test -f '$TEST_WORKDIR/test8_format/users.csv' && test \$(wc -l < '$TEST_WORKDIR/test8_format/users.csv') -eq 4 && head -1 '$TEST_WORKDIR/test8_format/users.csv' | grep -q '^name,age,city$'"
+
+# ============================================================
+# QUICK MODE: Skip complex tests 9-14 if --quick flag is set
+# ============================================================
+if [[ "$QUICK" != "--quick" ]]; then
 
 # ============================================================
 # TEST 9: REST API Client with Error Handling (stdlib only)
@@ -672,6 +692,8 @@ Call task_complete with summary." \
  python notes_cli.py list 2>&1 | grep -qi 'test' && \
  test -f '$TEST_WORKDIR/test14_cli/notes.json'" \
 200
+
+fi  # End of full test suite (tests 9-14 skipped in quick mode)
 
 # ============================================================
 # Results Summary
