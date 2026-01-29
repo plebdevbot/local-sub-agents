@@ -46,8 +46,9 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT INT TERM
 
-# Get all available models
-MODELS=$(ollama list | tail -n +2 | awk '{print $1}')
+# Get all available models (excluding poor performers)
+EXCLUDED_MODELS="llama3.1:8b|mistral:7b|ServiceNow-AI/Apriel-1.6-15b-Thinker:Q4_K_M"
+MODELS=$(ollama list | tail -n +2 | awk '{print $1}' | grep -vE "$EXCLUDED_MODELS")
 TOTAL=$(echo "$MODELS" | wc -l)
 
 log "Found $TOTAL models to benchmark:"

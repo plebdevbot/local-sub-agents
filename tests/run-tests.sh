@@ -693,7 +693,120 @@ Call task_complete with summary." \
  test -f '$TEST_WORKDIR/test14_cli/notes.json'" \
 200
 
-fi  # End of full test suite (tests 9-14 skipped in quick mode)
+# ============================================================
+# TEST 15: Web Search and Data Aggregation (Agentic)
+# ============================================================
+run_test "test15_web_search" \
+"You MUST use tools. This is an agentic information gathering task.
+
+Use web_search to find information about 'Rust programming language latest features'
+Then use web_search again for 'Rust vs Go performance comparison'
+Aggregate the findings and use write_file to create 'rust_research.md' with:
+- Summary of latest Rust features (from first search)
+- Performance comparison insights (from second search)  
+- Sources cited with URLs
+
+Call task_complete with summary of what you found." \
+"test -f '$TEST_WORKDIR/test15_web_search/rust_research.md' && \
+ grep -qi 'rust' '$TEST_WORKDIR/test15_web_search/rust_research.md' && \
+ grep -qi 'http' '$TEST_WORKDIR/test15_web_search/rust_research.md' && \
+ test \$(wc -l < '$TEST_WORKDIR/test15_web_search/rust_research.md') -ge 10" \
+180
+
+# ============================================================
+# TEST 16: System Configuration (Agentic)
+# ============================================================
+mkdir -p "$TEST_WORKDIR/test16_config/config"
+
+run_test "test16_config" \
+"You MUST use tools. Configure a complete development environment.
+
+1. Use write_file to create 'config/gitconfig' with:
+   - user.name = \"Test User\"
+   - user.email = \"test@example.com\"
+   - core.editor = vim
+
+2. Use write_file to create 'config/bashrc' with:
+   - Export PATH with ~/bin added
+   - Alias 'll' for 'ls -la'
+   - PS1 prompt customization
+
+3. Use write_file to create 'setup.sh' that:
+   - Copies both config files to appropriate locations
+   - Makes itself executable
+   - Echoes confirmation messages
+
+4. Use run_command: chmod +x setup.sh
+5. Use read_file to verify each config file was created correctly
+
+Call task_complete with summary." \
+"test -f '$TEST_WORKDIR/test16_config/config/gitconfig' && \
+ test -f '$TEST_WORKDIR/test16_config/config/bashrc' && \
+ test -f '$TEST_WORKDIR/test16_config/setup.sh' && \
+ test -x '$TEST_WORKDIR/test16_config/setup.sh' && \
+ grep -q 'user.name' '$TEST_WORKDIR/test16_config/config/gitconfig' && \
+ grep -q 'PATH' '$TEST_WORKDIR/test16_config/config/bashrc'" \
+200
+
+# ============================================================
+# TEST 17: Research and Report Generation (Multi-step Agentic)
+# ============================================================
+run_test "test17_research" \
+"You MUST use tools. This is a multi-step research task.
+
+1. Use web_search to find 'quantum computing current state 2024'
+2. Use web_search to find 'quantum computing companies'
+3. Use write_file to create 'research_notes.txt' with raw findings
+4. Analyze the findings and use write_file to create 'quantum_report.md' with:
+   - Executive summary
+   - Current state of quantum computing
+   - Key companies in the space
+   - Future outlook
+   - All sources cited with URLs
+
+5. Use run_command: wc -l quantum_report.md
+
+Call task_complete with summary." \
+"test -f '$TEST_WORKDIR/test17_research/research_notes.txt' && \
+ test -f '$TEST_WORKDIR/test17_research/quantum_report.md' && \
+ grep -qi 'quantum' '$TEST_WORKDIR/test17_research/quantum_report.md' && \
+ grep -qi 'http' '$TEST_WORKDIR/test17_research/quantum_report.md' && \
+ test \$(wc -l < '$TEST_WORKDIR/test17_research/quantum_report.md') -ge 20" \
+240
+
+# ============================================================
+# TEST 18: File Organization and Batch Processing (Agentic)
+# ============================================================
+mkdir -p "$TEST_WORKDIR/test18_organize/files"
+# Create test files
+for i in {1..5}; do
+    echo "Document $i content" > "$TEST_WORKDIR/test18_organize/files/doc$i.txt"
+    echo "# Report $i" > "$TEST_WORKDIR/test18_organize/files/report$i.md"
+done
+
+run_test "test18_organize" \
+"You MUST use tools. Organize and process files intelligently.
+
+1. Use list_files to see what's in the 'files' directory
+2. Create subdirectories 'docs' and 'reports'
+3. Use run_command to move .txt files to docs/ and .md files to reports/
+4. Use read_file to read each file and create 'index.json' with:
+   - File name, type, location, word count for each file
+   - JSON array format
+
+5. Use run_command: cat index.json
+6. Verify all files were organized with list_files on each subdirectory
+
+Call task_complete with summary of files organized." \
+"test -d '$TEST_WORKDIR/test18_organize/docs' && \
+ test -d '$TEST_WORKDIR/test18_organize/reports' && \
+ test -f '$TEST_WORKDIR/test18_organize/index.json' && \
+ test \$(find '$TEST_WORKDIR/test18_organize/docs' -name '*.txt' | wc -l) -eq 5 && \
+ test \$(find '$TEST_WORKDIR/test18_organize/reports' -name '*.md' | wc -l) -eq 5 && \
+ grep -q 'doc1.txt' '$TEST_WORKDIR/test18_organize/index.json'" \
+200
+
+fi  # End of full test suite (tests 9-18 skipped in quick mode)
 
 # ============================================================
 # Results Summary

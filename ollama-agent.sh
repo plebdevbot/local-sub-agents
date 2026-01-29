@@ -105,6 +105,21 @@ TOOLS='[
         "required": ["summary"]
       }
     }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_search",
+      "description": "Search the web using private SearXNG instance (no API limits). Returns titles, URLs, and content snippets.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query"},
+          "limit": {"type": "number", "description": "Max results to return (default 5)"}
+        },
+        "required": ["query"]
+      }
+    }
   }
 ]'
 
@@ -160,6 +175,20 @@ execute_tool() {
             echo "$summary"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             exit 0
+            ;;
+        web_search)
+            local query=$(echo "$args" | jq -r '.query')
+            local limit=$(echo "$args" | jq -r '.limit // 5')
+            log "Searching web for: $query"
+            local results=$(curl -s "http://192.168.8.101:8080/search?q=$(echo "$query" | jq -sRr @uri)&format=json" | \
+                jq -c --argjson limit "$limit" '.results[:$limit] | map({title, url, content})')
+            if [[ -n "$results" && "$results" != "null" ]]; then
+                success "Found $(echo "$results" | jq 'length') results"
+                echo "$results" | jq -r '.[] | "Title: \(.title)\nURL: \(.url)\nSnippet: \(.content)\n"'
+            else
+                error "Search failed or no results"
+                echo "Error: Search failed"
+            fi
             ;;
         *)
             error "Unknown tool: $name"
