@@ -56,6 +56,12 @@ Each benchmark run follows this strict sequence:
 #### `benchmark-all-models.sh`
 
 ```bash
+# CRITICAL: Trap-based cleanup (runs even on abnormal exit)
+cleanup_on_exit() {
+    ollama ps | tail -n +2 | awk '{print $1}' | xargs -I{} ollama stop {}
+}
+trap cleanup_on_exit EXIT INT TERM
+
 # Before each model:
 LOADED=$(ollama ps | tail -n +2 | wc -l)
 if [ "$LOADED" -gt 0 ]; then
@@ -70,6 +76,14 @@ sleep 5  # Wait for memory to clear
 #### `run-tests.sh`
 
 ```bash
+# CRITICAL: Trap-based cleanup (runs even on abnormal exit)
+cleanup_model_on_exit() {
+    if [[ -n "${MODEL:-}" ]]; then
+        ollama stop "$MODEL"
+    fi
+}
+trap "rm -rf $TEST_WORKDIR; cleanup_model_on_exit" EXIT INT TERM
+
 # At the end of all tests:
 ollama stop "$MODEL"
 ```
@@ -109,12 +123,38 @@ You should see:
 - ✅ No gradual memory leak across models
 - ✅ Clean transitions between models
 
+### Bulletproof Cleanup: Signal Traps
+
+**Problem:** If a script is killed (Ctrl+C, timeout, OOM), normal cleanup code at the end never runs.
+
+**Solution:** Use bash `trap` to register cleanup handlers that run on **any** exit:
+
+```bash
+trap cleanup_function EXIT INT TERM
+```
+
+This ensures cleanup runs on:
+- ✅ `EXIT` - Normal script exit
+- ✅ `INT` - Ctrl+C (SIGINT)
+- ✅ `TERM` - Kill signal (SIGTERM)
+
+**Implementation:**
+Both scripts now use traps to **guarantee** model unloading, even if:
+- Script crashes
+- User hits Ctrl+C
+- Process is killed
+- Timeout expires
+- OOM killer targets the script
+
+The trap runs cleanup code **before** the script terminates, ensuring no models are left loaded.
+
 ### What to Avoid
 
 ❌ **Never** run multiple benchmark scripts simultaneously  
 ❌ **Never** manually load a model while benchmark is running  
 ❌ **Never** skip the cleanup steps  
-❌ **Never** assume Ollama auto-unloads (it doesn't!)
+❌ **Never** assume Ollama auto-unloads (it doesn't!)  
+❌ **Never** remove the trap handlers (they're critical!)
 
 ### Troubleshooting
 

@@ -31,6 +31,21 @@ success() { echo -e "${GREEN}[success]${NC} $1"; }
 warn() { echo -e "${YELLOW}[warn]${NC} $1"; }
 error() { echo -e "${RED}[error]${NC} $1"; }
 
+# ============================================================
+# CRITICAL: Trap-based cleanup for bulletproof model unloading
+# This ensures models are ALWAYS unloaded, even on:
+#   - Script errors
+#   - SIGTERM (kill)
+#   - SIGINT (Ctrl+C)
+#   - Abnormal exit
+# ============================================================
+cleanup_on_exit() {
+    log "Cleanup triggered - unloading all models..."
+    ollama ps 2>/dev/null | tail -n +2 | awk '{print $1}' | xargs -I{} ollama stop {} 2>/dev/null || true
+    log "All models unloaded"
+}
+trap cleanup_on_exit EXIT INT TERM
+
 # Get all available models
 MODELS=$(ollama list | tail -n +2 | awk '{print $1}')
 TOTAL=$(echo "$MODELS" | wc -l)

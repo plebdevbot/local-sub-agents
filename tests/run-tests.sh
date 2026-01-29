@@ -27,9 +27,22 @@ log() { echo -e "${BLUE}[test]${NC} $1"; }
 pass() { echo -e "${GREEN}[PASS]${NC} $1"; }
 fail() { echo -e "${RED}[FAIL]${NC} $1"; }
 
+# ============================================================
+# CRITICAL: Trap-based cleanup for bulletproof model unloading
+# Ensures model is ALWAYS unloaded, even on abnormal exit
+# ============================================================
+cleanup_model_on_exit() {
+    if [[ -n "${MODEL:-}" ]]; then
+        log "Emergency cleanup - unloading $MODEL..."
+        ollama stop "$MODEL" 2>/dev/null || true
+    fi
+}
+
 mkdir -p "$RESULTS_DIR"
 TEST_WORKDIR=$(mktemp -d)
-trap "rm -rf $TEST_WORKDIR" EXIT
+
+# Compound trap: cleanup temp dir AND unload model
+trap "rm -rf $TEST_WORKDIR; cleanup_model_on_exit" EXIT INT TERM
 
 # Initialize results
 cat > "$RESULT_FILE" << EOF
