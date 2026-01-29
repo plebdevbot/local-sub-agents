@@ -1,6 +1,15 @@
 #!/bin/bash
 # benchmark-all-models.sh - Run the sub-agent benchmark against all local ollama models
 # Usage: ./benchmark-all-models.sh [--quick]
+#
+# IMPORTANT: This script runs ONE MODEL AT A TIME:
+#   1. Verify no models are loaded
+#   2. Load and test the model
+#   3. Explicitly unload the model from memory (ollama stop)
+#   4. Wait for memory to clear
+#   5. Move to next model
+#
+# This prevents OOM kills and ensures stable benchmarking.
 
 # Don't exit on errors - continue with next model
 set -uo pipefail
@@ -56,6 +65,17 @@ for MODEL in $MODELS; do
     log "[$CURRENT/$TOTAL] Testing: $MODEL"
     echo ""
     
+    # CRITICAL: Ensure no models are loaded before starting
+    log "Checking for loaded models..."
+    LOADED=$(ollama ps 2>/dev/null | tail -n +2 | wc -l)
+    if [ "$LOADED" -gt 0 ]; then
+        warn "Found $LOADED loaded model(s), unloading..."
+        ollama ps 2>/dev/null | tail -n +2 | awk '{print $1}' | xargs -I{} ollama stop {} 2>/dev/null || true
+        sleep 3
+    fi
+    log "Memory clear, starting $MODEL"
+    echo ""
+    
     # Record start time
     START_TIME=$(date +%s)
     
@@ -102,14 +122,30 @@ for MODEL in $MODELS; do
     echo "" >> "$SUMMARY_FILE"
     
     echo ""
-    echo "---"
+    log "Cleaning up after $MODEL"
     echo ""
     
     # Kill any lingering processes
     pkill -f "ollama-agent.sh" 2>/dev/null || true
     
-    # Give ollama a moment to unload the model
-    sleep 3
+    # CRITICAL: Explicitly unload the model from memory
+    log "Unloading model from memory..."
+    ollama stop "$MODEL" 2>/dev/null || true
+    
+    # Wait for model to fully unload
+    sleep 5
+    
+    # Verify no models are loaded
+    LOADED=$(ollama ps 2>/dev/null | tail -n +2 | wc -l)
+    if [ "$LOADED" -gt 0 ]; then
+        warn "Model still loaded, forcing stop..."
+        ollama ps 2>/dev/null | tail -n +2 | awk '{print $1}' | xargs -I{} ollama stop {} 2>/dev/null || true
+        sleep 3
+    fi
+    
+    log "Memory cleared, ready for next model"
+    echo "---"
+    echo ""
 done
 
 # Final summary

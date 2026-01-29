@@ -709,3 +709,13 @@ EOF
 echo ""
 echo "Results saved to: $RESULT_FILE"
 echo ""
+
+# ============================================================
+# Cleanup: Unload model from memory
+# ============================================================
+# CRITICAL: Always unload the model after testing to free memory
+# This prevents OOM issues when running multiple models sequentially
+log "Unloading model from memory..."
+ollama stop "$MODEL" 2>/dev/null || true
+log "Model unloaded, memory freed"
+echo ""
