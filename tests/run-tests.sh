@@ -135,10 +135,9 @@ calculate_quality_score() {
     local avg_iterations=$2
     local avg_time=$3
 
-    awk -v pr="$pass_rate" -v ai="$avg_iterations" -v at="$avg_time" \
+    awk -v pr="$pass_rate" -v ai="$avg_iterations" \
         -v wc="$WEIGHT_CORRECTNESS" -v we="$WEIGHT_EFFICIENCY" \
-        -v ws="$WEIGHT_SPEED" -v wf="$WEIGHT_FORMAT" \
-        -v bi="$BASELINE_ITERATIONS" -v bt="$BASELINE_TIME" '
+        -v wf="$WEIGHT_FORMAT" -v bi="$BASELINE_ITERATIONS" '
     BEGIN {
         # Correctness score
         correctness = pr * wc
@@ -265,7 +264,7 @@ run_test "test4_transform" \
 4. Use run_command: cat report.txt
 
 Call task_complete with summary." \
-"test -f '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(alice.*85|85.*alice)' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(bob.*92|92.*bob)' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(carol.*78|78.*carol)' '$TEST_WORKDIR/test4_transform/report.txt'"
+"test -f '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(alice.*85|85.*alice)' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(bob.*92|92.*bob)' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(carol.*78|78.*carol)' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(average|avg|mean).*(85|85\.0)|(85|85\.0).*(average|avg|mean)' '$TEST_WORKDIR/test4_transform/report.txt'"
 
 # ============================================================
 # TEST 5: Error Handling
