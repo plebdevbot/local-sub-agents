@@ -148,16 +148,13 @@ calculate_quality_score() {
         if (efficiency < 0) efficiency = 0
         if (efficiency > we) efficiency = we
         
-        # Speed score (faster = better)
-        speed = ws * (1 - (at - bt) / bt)
-        if (speed < 0) speed = 0
-        if (speed > ws) speed = ws
+        # Speed score omitted (WEIGHT_SPEED=0 - we prioritize quality over speed)
         
         # Format score
         format = pr * wf
         
         # Total
-        total = int(correctness + efficiency + speed + format)
+        total = int(correctness + efficiency + format)
         print total
     }'
 }
@@ -268,7 +265,7 @@ run_test "test4_transform" \
 4. Use run_command: cat report.txt
 
 Call task_complete with summary." \
-"test -f '$TEST_WORKDIR/test4_transform/report.txt' && grep -qi 'alice' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qi 'bob' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qi 'carol' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qE '85(\.0+)?|85\b' '$TEST_WORKDIR/test4_transform/report.txt'"
+"test -f '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(alice.*85|85.*alice)' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(bob.*92|92.*bob)' '$TEST_WORKDIR/test4_transform/report.txt' && grep -qiE '(carol.*78|78.*carol)' '$TEST_WORKDIR/test4_transform/report.txt'"
 
 # ============================================================
 # TEST 5: Error Handling
@@ -315,7 +312,7 @@ run_test "test6_multifile" \
 4. Use run_command: node main.js (should now show correct year like 2026)
 
 Call task_complete with what you fixed." \
-"node '$TEST_WORKDIR/test6_multifile/main.js' 2>&1 | grep -qE '202[4-9]'"
+"output=\$(node '$TEST_WORKDIR/test6_multifile/main.js' 2>&1) && echo \"\$output\" | grep -qvF 'YYYY-' && echo \"\$output\" | grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2}'"
 
 # ============================================================
 # TEST 7: Iterative Debugging
@@ -440,7 +437,7 @@ Use run_command: python expr_parser.py
 Call task_complete with summary." \
 "test -f '$TEST_WORKDIR/test10_parser/expr_parser.py' && \
  grep -q 'parse_and_eval' '$TEST_WORKDIR/test10_parser/expr_parser.py' && \
- python '$TEST_WORKDIR/test10_parser/expr_parser.py' 2>&1 | grep -c 'PASS' | grep -qE '^[4-5]$'" \
+ python '$TEST_WORKDIR/test10_parser/expr_parser.py' 2>&1 | grep -c 'PASS' | grep -qE '^5$'" \
 200
 
 # ============================================================
@@ -593,7 +590,7 @@ Create an async task processor using ONLY stdlib. Use write_file to create 'asyn
 
 2. An async function process_all(items) that:
    - Processes all items concurrently using asyncio.gather
-   - Each item gets a random delay between 0.1 and 0.5 seconds
+   - Uses these fixed delays: [0.1, 0.2, 0.3, 0.4, 0.5] for the 5 items respectively
    - Returns list of results
 
 3. Main block that tests:
@@ -651,7 +648,7 @@ Call task_complete with summary." \
  test -f '$TEST_WORKDIR/test13_sql/revenue.csv' && \
  sqlite3 '$TEST_WORKDIR/test13_sql/shop.db' 'SELECT COUNT(*) FROM products' | grep -qE '^[4-9]' && \
  sqlite3 '$TEST_WORKDIR/test13_sql/shop.db' 'SELECT COUNT(*) FROM orders' | grep -qE '^[5-9]' && \
- grep -qi 'electronics\|furniture' '$TEST_WORKDIR/test13_sql/revenue.csv'" \
+ grep -qiE '(electronics|furniture)' '$TEST_WORKDIR/test13_sql/revenue.csv'" \
 200
 
 # ============================================================
