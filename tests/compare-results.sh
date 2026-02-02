@@ -34,7 +34,17 @@ for result in "$RESULTS_DIR"/*.md; do
     [ -f "$result" ] || continue
 
     filename=$(basename "$result")
-    model=$(echo "$filename" | sed 's/_[0-9]*\.md$//' | tr '_' ':' | sed 's/:latest//')
+
+    # Parse runtime and model from filename
+    # New format: runtime_model_timestamp.md (e.g., ollama_qwen3_8b_20260202_120000.md)
+    # Old format: model_timestamp.md (e.g., qwen3_8b_20260202_120000.md)
+    if [[ "$filename" =~ ^(ollama|vllm|llamacpp)_ ]]; then
+        runtime=$(echo "$filename" | cut -d'_' -f1)
+        model=$(echo "$filename" | sed "s/^${runtime}_//" | sed 's/_[0-9]\{8\}_[0-9]\{6\}\.md$//' | tr '_' ':' | sed 's/:latest//')
+    else
+        runtime="ollama"
+        model=$(echo "$filename" | sed 's/_[0-9]*\.md$//' | tr '_' ':' | sed 's/:latest//')
+    fi
 
     # Extract stats from the file
     passed=$(grep -oP "Passed:\*\* \K[0-9]+" "$result" 2>/dev/null || echo "0")
@@ -61,8 +71,8 @@ for result in "$RESULTS_DIR"/*.md; do
         fi
     done < "$result"
 
-    results_json+=("{\"model\":\"$model\",\"passed\":$passed,\"total\":$total,\"time_seconds\":$total_time,\"avg_seconds\":$avg,\"quality_score\":${quality_score:--1},\"total_iterations\":$total_iterations,\"avg_iterations\":$avg_iterations,\"date\":\"$date\",\"tests\":[$test_results]}")
-    results_table+=("| $model | $passed/$total | ${quality_score:-?} | ${total_time}s | ${avg}s | $date |")
+    results_json+=("{\"runtime\":\"$runtime\",\"model\":\"$model\",\"passed\":$passed,\"total\":$total,\"time_seconds\":$total_time,\"avg_seconds\":$avg,\"quality_score\":${quality_score:--1},\"total_iterations\":$total_iterations,\"avg_iterations\":$avg_iterations,\"date\":\"$date\",\"tests\":[$test_results]}")
+    results_table+=("| $runtime | $model | $passed/$total | ${quality_score:-?} | ${total_time}s | ${avg}s | $date |")
 done
 
 if $JSON_MODE; then
@@ -84,8 +94,8 @@ else
     echo "║         Model Comparison Report                           ║"
     echo "╚═══════════════════════════════════════════════════════════╝"
     echo ""
-    echo "| Model | Passed | Score | Total Time | Avg/Test | Date |"
-    echo "|-------|--------|-------|------------|----------|------|"
+    echo "| Runtime | Model | Passed | Score | Total Time | Avg/Test | Date |"
+    echo "|---------|-------|--------|-------|------------|----------|------|"
     for row in "${results_table[@]}"; do
         echo "$row"
     done

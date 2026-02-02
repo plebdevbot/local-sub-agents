@@ -1,20 +1,69 @@
 #!/bin/bash
 # run-tests.sh - Run all sub-agent tests against a model
-# Usage: ./run-tests.sh [model] [--quick]
+# Usage: ./run-tests.sh [model] [--quick] [--runtime RUNTIME]
 # Examples:
-#   ./run-tests.sh                    # Uses default (qwen3:8b)
+#   ./run-tests.sh                              # Uses default (qwen3:8b, ollama)
 #   ./run-tests.sh glm-4.7-flash:latest
-#   ./run-tests.sh qwen3:8b --quick   # Skip verification prompts
+#   ./run-tests.sh qwen3:8b --quick             # Skip complex tests 9-18
+#   ./run-tests.sh qwen3:8b --runtime llamacpp  # Use llama.cpp runtime
+#   ./run-tests.sh meta-llama/Llama-3.1-8B-Instruct --runtime vllm
 
 set -euo pipefail
 
-MODEL="${1:-qwen3:8b}"
-QUICK="${2:-}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGENT="$SCRIPT_DIR/../ollama-agent.sh"
+
+# Parse arguments
+MODEL="qwen3:8b"
+QUICK=""
+RUNTIME="ollama"
+
+# First positional arg is model (if not a flag)
+if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    MODEL="$1"
+    shift
+fi
+
+# Parse remaining flags
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --quick)
+            QUICK="--quick"
+            shift
+            ;;
+        --runtime)
+            RUNTIME="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# Select agent based on runtime
+case "$RUNTIME" in
+    ollama)
+        AGENT="$SCRIPT_DIR/../ollama-agent.sh"
+        ;;
+    vllm|llamacpp)
+        AGENT="$SCRIPT_DIR/../agent-wrapper.sh"
+        ;;
+    *)
+        echo "Error: Unknown runtime '$RUNTIME'"
+        echo "Supported: ollama, vllm, llamacpp"
+        exit 1
+        ;;
+esac
+
+# Verify agent script exists
+if [[ ! -f "$AGENT" ]]; then
+    echo "Error: Agent script not found: $AGENT"
+    exit 1
+fi
+
 RESULTS_DIR="$SCRIPT_DIR/results"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-RESULT_FILE="$RESULTS_DIR/${MODEL//[:\/]/_}_$TIMESTAMP.md"
+RESULT_FILE="$RESULTS_DIR/${RUNTIME}_${MODEL//[:\/]/_}_$TIMESTAMP.md"
 
 # Colors
 RED='\033[0;31m'
@@ -32,7 +81,7 @@ fail() { echo -e "${RED}[FAIL]${NC} $1"; }
 # Ensures model is ALWAYS unloaded, even on abnormal exit
 # ============================================================
 cleanup_model_on_exit() {
-    if [[ -n "${MODEL:-}" ]]; then
+    if [[ -n "${MODEL:-}" && "${RUNTIME:-ollama}" == "ollama" ]]; then
         log "Emergency cleanup - unloading $MODEL..."
         ollama stop "$MODEL" 2>/dev/null || true
     fi
@@ -46,11 +95,12 @@ trap "rm -rf $TEST_WORKDIR; cleanup_model_on_exit" EXIT INT TERM
 
 # Initialize results
 cat > "$RESULT_FILE" << EOF
-# Test Results: $MODEL
+# Test Results: $MODEL ($RUNTIME)
 
-**Date:** $(date "+%Y-%m-%d %H:%M:%S")  
-**Model:** $MODEL  
-**Host:** $(hostname)  
+**Date:** $(date "+%Y-%m-%d %H:%M:%S")
+**Model:** $MODEL
+**Runtime:** $RUNTIME
+**Host:** $(hostname)
 
 ---
 
@@ -87,10 +137,14 @@ run_test() {
     local start_time=$(date +%s)
 
     # Run the agent with timeout (use --kill-after to ensure cleanup)
-    timeout --kill-after=10s "$timeout_secs" bash -c "OLLAMA_MODEL=\"$MODEL\" \"$AGENT\" \"$prompt\" \"$workdir\"" > "$workdir/output.log" 2>&1 || true
-    
+    if [[ "$RUNTIME" == "ollama" ]]; then
+        timeout --kill-after=10s "$timeout_secs" bash -c "OLLAMA_MODEL=\"$MODEL\" \"$AGENT\" \"$prompt\" \"$workdir\"" > "$workdir/output.log" 2>&1 || true
+    else
+        timeout --kill-after=10s "$timeout_secs" bash -c "MODEL=\"$MODEL\" \"$AGENT\" --runtime \"$RUNTIME\" \"$prompt\" \"$workdir\"" > "$workdir/output.log" 2>&1 || true
+    fi
+
     # Ensure any lingering child processes are killed
-    pkill -P $$ -f "ollama-agent.sh" 2>/dev/null || true
+    pkill -P $$ -f "ollama-agent.sh\|agent-wrapper.sh" 2>/dev/null || true
 
     local end_time=$(date +%s)
     local elapsed=$((end_time - start_time))
@@ -179,23 +233,42 @@ echo ""
 echo "╔═══════════════════════════════════════════════════════════╗"
 echo "║         Local Sub-Agent Test Suite                        ║"
 echo "╠═══════════════════════════════════════════════════════════╣"
-echo "║  Model: $MODEL"
-echo "║  Time:  $(date "+%Y-%m-%d %H:%M:%S")"
+echo "║  Model:   $MODEL"
+echo "║  Runtime: $RUNTIME"
+echo "║  Time:    $(date "+%Y-%m-%d %H:%M:%S")"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
 
-# Check Ollama is running
-if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-    echo "Error: Ollama is not running. Start it with: ollama serve"
-    exit 1
-fi
-
-# Ensure model is loaded
-log "Warming up model: $MODEL"
-if ! curl -s http://localhost:11434/api/chat -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"stream\":false}" > /dev/null 2>&1; then
-    echo "Error: Failed to warm up model. Is '$MODEL' pulled? Try: ollama pull $MODEL"
-    exit 1
-fi
+# Check runtime is available
+case "$RUNTIME" in
+    ollama)
+        if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+            echo "Error: Ollama is not running. Start it with: ollama serve"
+            exit 1
+        fi
+        log "Warming up model: $MODEL"
+        if ! curl -s http://localhost:11434/api/chat -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"stream\":false}" > /dev/null 2>&1; then
+            echo "Error: Failed to warm up model. Is '$MODEL' pulled? Try: ollama pull $MODEL"
+            exit 1
+        fi
+        ;;
+    vllm)
+        if ! curl -s http://localhost:8000/v1/models > /dev/null 2>&1; then
+            echo "Error: vLLM is not running. Start it with:"
+            echo "  vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000"
+            exit 1
+        fi
+        log "vLLM server detected"
+        ;;
+    llamacpp)
+        if ! curl -s http://localhost:8080/v1/models > /dev/null 2>&1; then
+            echo "Error: llama.cpp server is not running. Start it with:"
+            echo "  llama-server -m model.gguf --port 8080"
+            exit 1
+        fi
+        log "llama.cpp server detected"
+        ;;
+esac
 
 # Quick mode indicator
 if [[ "$QUICK" == "--quick" ]]; then
@@ -844,11 +917,13 @@ echo "Results saved to: $RESULT_FILE"
 echo ""
 
 # ============================================================
-# Cleanup: Unload model from memory
+# Cleanup: Unload model from memory (Ollama only)
 # ============================================================
 # CRITICAL: Always unload the model after testing to free memory
 # This prevents OOM issues when running multiple models sequentially
-log "Unloading model from memory..."
-ollama stop "$MODEL" 2>/dev/null || true
-log "Model unloaded, memory freed"
+if [[ "$RUNTIME" == "ollama" ]]; then
+    log "Unloading model from memory..."
+    ollama stop "$MODEL" 2>/dev/null || true
+    log "Model unloaded, memory freed"
+fi
 echo ""
